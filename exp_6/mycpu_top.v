@@ -60,6 +60,7 @@ wire [ 4:0] op_19_15;
 wire [ 4:0] rd;
 wire [ 4:0] rj;
 wire [ 4:0] rk;
+wire        rj_eq_rd;
 wire [11:0] i12;
 wire [19:0] i20;
 wire [15:0] i16;
