@@ -33,11 +33,38 @@ module mycpu_top(
         end
     end
 
-    assign inst_sram_en    = reset ? 1'b0 : 1'b1;
-    assign inst_sram_we    = 4'b0;
-    assign inst_sram_wdata = 32'b0;
+    wire if_valid;
+    wire id_valid;
+    wire exe_valid;
+    wire mem_valid;
+    wire wb_valid;
 
-    assign data_sram_en    = reset ? 1'b0 : 1'b1;
+    wire if_ready_go;
+    wire id_ready_go;
+    wire exe_ready_go;
+    wire mem_ready_go;
+    wire wb_ready_go;
+
+    wire id_allowin;
+    wire exe_allowin;
+    wire mem_allowin;
+    wire wb_allowin;
+
+    wire if_willgo;
+    wire id_willgo;
+    wire exe_willgo;
+    wire mem_willgo;
+    wire wb_willgo;
+
+    // read after write
+    wire id_need_rj;
+    wire id_need_rk;
+    wire id_need_rd;
+    wire id_block;
+
+    wire [31:0] pc;
+    wire [31:0] seq_pc;
+    wire [31:0] nextpc;
 
     // instruction fetch
 
@@ -47,7 +74,6 @@ module mycpu_top(
 
     // -----------------
 
-    wire [31:0] pc;
     wire [31:0] if_pc;
     wire [31:0] if_inst;
     wire [31:0] id_pc;
@@ -57,25 +83,20 @@ module mycpu_top(
     assign if_inst         = inst;
 
     IF_ID_reg if_id_reg(
-        .clk     (clk    ),
-        .rst     (reset  ),
-        .if_pc   (if_pc  ),
-        .if_inst (if_inst),
-        .id_pc   (id_pc  ),
-        .id_inst (id_inst)
-    );
-
-    PC_reg pc_reg(
-        .clk    (clk   ),
-        .rst    (reset ),
-        .nextpc (nextpc),
-        .pc     (pc    )
+        .clk         (clk        ),
+        .rst         (reset      ),
+        .if_ready_go (if_ready_go),
+        .id_allowin  (id_allowin ),
+        .if_valid    (if_valid   ),
+        .if_pc       (if_pc      ),
+        .if_inst     (if_inst    ),
+        .id_valid    (id_valid   ),
+        .id_pc       (id_pc      ),
+        .id_inst     (id_inst    )
     );
 
     // instruction decode
 
-    wire [31:0] seq_pc;
-    wire [31:0] nextpc;
     wire        br_taken;
     wire [31:0] br_target;
 
@@ -148,9 +169,6 @@ module mycpu_top(
 
     wire [31:0] alu_src1;
     wire [31:0] alu_src2;
-
-    assign seq_pc         = pc + 32'h4;
-    assign nextpc         = br_taken ? br_target : seq_pc;
 
     assign inst_sram_addr = nextpc;
 
@@ -256,7 +274,7 @@ module mycpu_top(
                        || inst_jirl
                        || inst_bl
                        || inst_b
-                       ) && valid;
+                       ) && valid && id_valid && !id_block;
     assign br_target = (inst_beq || inst_bne || inst_bl || inst_b) ? (id_pc + br_offs) : (rj_value + jirl_offs);
 
     assign alu_src1  = src1_is_pc  ? id_pc[31:0] : rj_value;
@@ -294,6 +312,9 @@ module mycpu_top(
     ID_EXE_reg id_exe_reg(
         .clk                 (clk                ),
         .rst                 (reset              ),
+        .id_ready_go         (id_ready_go        ),
+        .exe_allowin         (exe_allowin        ),
+        .id_valid            (id_valid           ),
         .id_pc               (id_pc              ),
         .id_alu_op           (id_alu_op          ),
         .id_alu_src1         (id_alu_src1        ),
@@ -303,6 +324,7 @@ module mycpu_top(
         .id_rf_we            (id_rf_we           ),
         .id_rf_waddr         (id_rf_waddr        ),
         .id_res_from_mem     (id_res_from_mem    ),
+        .exe_valid           (exe_valid          ),
         .exe_pc              (exe_pc             ),
         .exe_alu_op          (exe_alu_op         ),
         .exe_alu_src1        (exe_alu_src1       ),
@@ -326,7 +348,7 @@ module mycpu_top(
     );
 
     assign data_sram_addr  = alu_result;
-    assign data_sram_we    = exe_data_sram_we;
+    assign data_sram_we    = exe_data_sram_we & {4{exe_valid}};
     assign data_sram_wdata = exe_data_sram_wdata;
 
     // -------
@@ -345,6 +367,9 @@ module mycpu_top(
     EXE_MEM_reg exe_mem_reg(
         .clk                 (clk                ),
         .rst                 (reset              ),
+        .exe_ready_go        (exe_ready_go       ),
+        .mem_allowin         (mem_allowin        ),
+        .exe_valid           (exe_valid          ),
         .exe_pc              (exe_pc             ),
         .exe_data_sram_we    (exe_data_sram_we   ),
         .exe_data_sram_wdata (exe_data_sram_wdata),
@@ -352,6 +377,7 @@ module mycpu_top(
         .exe_rf_waddr        (exe_rf_waddr       ),
         .exe_res_from_mem    (exe_res_from_mem   ),
         .exe_alu_result      (exe_alu_result     ),
+        .mem_valid           (mem_valid          ),
         .mem_pc              (mem_pc             ),
         .mem_data_sram_we    (mem_data_sram_we   ),
         .mem_data_sram_wdata (mem_data_sram_wdata),
@@ -382,10 +408,14 @@ module mycpu_top(
     MEM_WB_reg mem_wb_reg(
         .clk          (clk         ),
         .rst          (reset       ),
+        .mem_ready_go (mem_ready_go),
+        .wb_allowin   (wb_allowin  ),
+        .mem_valid    (mem_valid   ),
         .mem_pc       (mem_pc      ),
         .mem_rf_we    (mem_rf_we   ),
         .mem_rf_waddr (mem_rf_waddr),
         .mem_rf_wdata (mem_rf_wdata),
+        .wb_valid     (wb_valid    ),
         .wb_pc        (wb_pc       ),
         .wb_rf_we     (wb_rf_we    ),
         .wb_rf_waddr  (wb_rf_waddr ),
@@ -398,11 +428,53 @@ module mycpu_top(
     wire [ 4:0] rf_waddr;
     wire [31:0] rf_wdata;
 
-    assign rf_we     = wb_rf_we;
+    assign rf_we     = wb_rf_we && wb_valid;
     assign rf_waddr  = wb_rf_waddr;
     assign rf_wdata  = wb_rf_wdata;
 
     // ----------
+
+    assign if_valid     = !id_valid || !br_taken;
+
+    assign if_ready_go  = if_valid;
+    assign id_ready_go  = id_valid && !id_block;
+    assign exe_ready_go = exe_valid;
+    assign mem_ready_go = mem_valid;
+    assign wb_ready_go  = wb_valid;
+
+    assign id_allowin   = !id_valid || (id_ready_go && exe_allowin);
+    assign exe_allowin  = !exe_valid || (exe_ready_go && mem_allowin);
+    assign mem_allowin  = !mem_valid || (mem_ready_go && wb_allowin);
+    assign wb_allowin   = 1'b1;
+
+    assign if_willgo    = if_ready_go && id_allowin;
+    assign id_willgo    = id_ready_go && exe_allowin;
+    assign exe_willgo   = exe_ready_go && mem_allowin;
+    assign mem_willgo   = mem_ready_go && wb_allowin;
+    assign wb_willgo    = wb_ready_go;
+
+    assign id_need_rj   = !inst_lu12i_w && !inst_b && !inst_bl && (rj != 5'b0);
+    assign id_need_rk   = (inst_add_w || inst_sub_w || inst_slt || inst_sltu || inst_and || inst_or || inst_nor || inst_xor) && (rk != 5'b0);
+    assign id_need_rd   = (inst_beq || inst_bne || inst_st_w) && (rd != 5'b0);
+    assign id_block     = (id_need_rj && exe_valid && exe_rf_we && exe_rf_waddr == rj)
+                       || (id_need_rk && exe_valid && exe_rf_we && exe_rf_waddr == rk)
+                       || (id_need_rd && exe_valid && exe_rf_we && exe_rf_waddr == rd)
+                       || (id_need_rj && mem_valid && mem_rf_we && mem_rf_waddr == rj)
+                       || (id_need_rk && mem_valid && mem_rf_we && mem_rf_waddr == rk)
+                       || (id_need_rd && mem_valid && mem_rf_we && mem_rf_waddr == rd)
+                       || (id_need_rj && wb_valid  && wb_rf_we  && wb_rf_waddr  == rj)
+                       || (id_need_rk && wb_valid  && wb_rf_we  && wb_rf_waddr  == rk)
+                       || (id_need_rd && wb_valid  && wb_rf_we  && wb_rf_waddr  == rd);
+
+    PC_reg pc_reg(
+        .clk    (clk   ),
+        .rst    (reset ),
+        .nextpc (nextpc),
+        .pc     (pc    )
+    );
+
+    assign seq_pc = if_willgo ? pc + 32'h4 : pc;
+    assign nextpc = br_taken ? br_target : seq_pc;
 
     regfile u_regfile(
         .clk    (clk      ),
@@ -415,9 +487,15 @@ module mycpu_top(
         .wdata  (rf_wdata )
     );
 
+    assign inst_sram_en    = reset ? 1'b0 : 1'b1;
+    assign inst_sram_we    = 4'b0;
+    assign inst_sram_wdata = 32'b0;
+
+    assign data_sram_en    = reset ? 1'b0 : 1'b1;
+
     // debug info generate
     assign debug_wb_pc       = wb_pc;
-    assign debug_wb_rf_we    = wb_rf_we;
+    assign debug_wb_rf_we    = {4{rf_we}};
     assign debug_wb_rf_wnum  = wb_rf_waddr;
     assign debug_wb_rf_wdata = wb_rf_wdata;
 

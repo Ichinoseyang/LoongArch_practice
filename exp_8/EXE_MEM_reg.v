@@ -1,6 +1,11 @@
 module EXE_MEM_reg (
     input  wire        clk,
     input  wire        rst,
+
+    input  wire        exe_ready_go,
+    input  wire        mem_allowin,
+
+    input  wire        exe_valid,
     input  wire [31:0] exe_pc,
     input  wire [ 3:0] exe_data_sram_we,
     input  wire [31:0] exe_data_sram_wdata,
@@ -9,6 +14,7 @@ module EXE_MEM_reg (
     input  wire        exe_res_from_mem,
     input  wire [31:0] exe_alu_result,
 
+    output reg         mem_valid,
     output reg  [31:0] mem_pc,
     output reg  [ 3:0] mem_data_sram_we,
     output reg  [31:0] mem_data_sram_wdata,
@@ -20,6 +26,27 @@ module EXE_MEM_reg (
 
     always @(posedge clk) begin
         if (rst) begin
+            mem_valid           <= 1'b0;
+            mem_pc              <= 32'b0;
+            mem_data_sram_we    <=  4'b0;
+            mem_data_sram_wdata <= 32'b0;
+            mem_rf_we           <=  1'b0;
+            mem_rf_waddr        <=  5'b0;
+            mem_res_from_mem    <=  1'b0;
+            mem_alu_result      <= 32'b0;
+        end
+        else if (!mem_allowin) begin
+            mem_valid           <= mem_valid;
+            mem_pc              <= mem_pc;
+            mem_data_sram_we    <= mem_data_sram_we;
+            mem_data_sram_wdata <= mem_data_sram_wdata;
+            mem_rf_we           <= mem_rf_we;
+            mem_rf_waddr        <= mem_rf_waddr;
+            mem_res_from_mem    <= mem_res_from_mem;
+            mem_alu_result      <= mem_alu_result;
+        end
+        else if (!exe_ready_go) begin
+            mem_valid           <= 1'b0;
             mem_pc              <= 32'b0;
             mem_data_sram_we    <=  4'b0;
             mem_data_sram_wdata <= 32'b0;
@@ -29,6 +56,7 @@ module EXE_MEM_reg (
             mem_alu_result      <= 32'b0;
         end
         else begin
+            mem_valid           <= exe_valid;
             mem_pc              <= exe_pc;
             mem_data_sram_we    <= exe_data_sram_we;
             mem_data_sram_wdata <= exe_data_sram_wdata;
