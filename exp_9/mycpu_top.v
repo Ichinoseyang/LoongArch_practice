@@ -57,10 +57,37 @@ module mycpu_top(
     wire wb_willgo;
 
     // read after write
+    wire id_block;
     wire id_need_rj;
     wire id_need_rk;
     wire id_need_rd;
-    wire id_block;
+
+    // forward
+    wire [31:0] real_rj;
+    wire [31:0] real_rk;
+    wire [31:0] real_rd;
+
+    wire exe_use_rj;
+    wire exe_use_rk;
+    wire exe_use_rd;
+    wire mem_use_rj;
+    wire mem_use_rk;
+    wire mem_use_rd;
+    wire wb_use_rj;
+    wire wb_use_rk;
+    wire wb_use_rd;
+
+    wire exe_needforward_rj;
+    wire exe_needforward_rk;
+    wire exe_needforward_rd;
+    wire mem_needforward_rj;
+    wire mem_needforward_rk;
+    wire mem_needforward_rd;
+    wire wb_needforward_rj;
+    wire wb_needforward_rk;
+    wire wb_needforward_rd;
+
+    // PC
 
     wire [31:0] pc;
     wire [31:0] seq_pc;
@@ -264,8 +291,8 @@ module mycpu_top(
     assign rf_raddr1      = rj;
     assign rf_raddr2      = src_reg_is_rd ? rd : rk;
 
-    assign rj_value  = rf_rdata1;
-    assign rkd_value = rf_rdata2;
+    assign rj_value  = real_rj;
+    assign rkd_value = src_reg_is_rd ? real_rd : real_rk;
 
     assign rj_eq_rd  = (rj_value == rkd_value);
 
@@ -456,15 +483,43 @@ module mycpu_top(
     assign id_need_rj   = !inst_lu12i_w && !inst_b && !inst_bl && (rj != 5'b0);
     assign id_need_rk   = (inst_add_w || inst_sub_w || inst_slt || inst_sltu || inst_and || inst_or || inst_nor || inst_xor) && (rk != 5'b0);
     assign id_need_rd   = (inst_beq || inst_bne || inst_st_w) && (rd != 5'b0);
-    assign id_block     = (id_need_rj && exe_valid && exe_rf_we && exe_rf_waddr == rj)
-                       || (id_need_rk && exe_valid && exe_rf_we && exe_rf_waddr == rk)
-                       || (id_need_rd && exe_valid && exe_rf_we && exe_rf_waddr == rd)
-                       || (id_need_rj && mem_valid && mem_rf_we && mem_rf_waddr == rj)
-                       || (id_need_rk && mem_valid && mem_rf_we && mem_rf_waddr == rk)
-                       || (id_need_rd && mem_valid && mem_rf_we && mem_rf_waddr == rd)
-                       || (id_need_rj && wb_valid  && wb_rf_we  && wb_rf_waddr  == rj)
-                       || (id_need_rk && wb_valid  && wb_rf_we  && wb_rf_waddr  == rk)
-                       || (id_need_rd && wb_valid  && wb_rf_we  && wb_rf_waddr  == rd);
+
+    assign exe_use_rj   = exe_valid && exe_rf_we && exe_rf_waddr == rj;
+    assign exe_use_rk   = exe_valid && exe_rf_we && exe_rf_waddr == rk;
+    assign exe_use_rd   = exe_valid && exe_rf_we && exe_rf_waddr == rd;
+    assign mem_use_rj   = mem_valid && mem_rf_we && mem_rf_waddr == rj;
+    assign mem_use_rk   = mem_valid && mem_rf_we && mem_rf_waddr == rk;
+    assign mem_use_rd   = mem_valid && mem_rf_we && mem_rf_waddr == rd;
+    assign wb_use_rj    = wb_valid  && wb_rf_we  && wb_rf_waddr  == rj;
+    assign wb_use_rk    = wb_valid  && wb_rf_we  && wb_rf_waddr  == rk;
+    assign wb_use_rd    = wb_valid  && wb_rf_we  && wb_rf_waddr  == rd;
+
+    assign exe_needforward_rj = exe_use_rj && id_need_rj;
+    assign exe_needforward_rk = exe_use_rk && id_need_rk;
+    assign exe_needforward_rd = exe_use_rd && id_need_rd;
+    assign mem_needforward_rj = mem_use_rj && id_need_rj;
+    assign mem_needforward_rk = mem_use_rk && id_need_rk;
+    assign mem_needforward_rd = mem_use_rd && id_need_rd;
+    assign wb_needforward_rj  = wb_use_rj  && id_need_rj;
+    assign wb_needforward_rk  = wb_use_rk  && id_need_rk;
+    assign wb_needforward_rd  = wb_use_rd  && id_need_rd;
+
+    assign real_rj = exe_needforward_rj ? exe_alu_result :
+                     mem_needforward_rj ? mem_rf_wdata   :
+                     wb_needforward_rj  ? wb_rf_wdata    :
+                     rf_rdata1;
+
+    assign real_rk = exe_needforward_rk ? exe_alu_result :
+                     mem_needforward_rk ? mem_rf_wdata   :
+                     wb_needforward_rk  ? wb_rf_wdata    :
+                     rf_rdata2;
+
+    assign real_rd = exe_needforward_rd ? exe_alu_result :
+                     mem_needforward_rd ? mem_rf_wdata   :
+                     wb_needforward_rd  ? wb_rf_wdata    :
+                     rf_rdata2;
+
+    assign id_block = (exe_needforward_rj || exe_needforward_rk || exe_needforward_rd) && exe_res_from_mem;
 
     PC_reg pc_reg(
         .clk    (clk   ),
