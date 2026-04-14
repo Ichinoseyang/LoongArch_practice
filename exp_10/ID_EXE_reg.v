@@ -7,7 +7,7 @@ module ID_EXE_reg (
 
     input  wire        id_valid,
     input  wire [31:0] id_pc,
-    input  wire [11:0] id_alu_op,
+    input  wire [18:0] id_alu_op,
     input  wire [31:0] id_alu_src1,
     input  wire [31:0] id_alu_src2,
     input  wire [ 3:0] id_data_sram_we,
@@ -18,7 +18,7 @@ module ID_EXE_reg (
 
     output reg         exe_valid,
     output reg  [31:0] exe_pc,
-    output reg  [11:0] exe_alu_op,
+    output reg  [18:0] exe_alu_op,
     output reg  [31:0] exe_alu_src1,
     output reg  [31:0] exe_alu_src2,
     output reg  [ 3:0] exe_data_sram_we,
