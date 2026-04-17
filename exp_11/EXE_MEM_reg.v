@@ -13,6 +13,7 @@ module EXE_MEM_reg (
     input  wire [ 4:0] exe_rf_waddr,
     input  wire        exe_res_from_mem,
     input  wire [31:0] exe_alu_result,
+    input  wire [ 4:0] exe_op_ld,
 
     output reg         mem_valid,
     output reg  [31:0] mem_pc,
@@ -21,12 +22,13 @@ module EXE_MEM_reg (
     output reg         mem_rf_we,
     output reg  [ 4:0] mem_rf_waddr,
     output reg         mem_res_from_mem,
-    output reg  [31:0] mem_alu_result
+    output reg  [31:0] mem_alu_result,
+    output reg  [ 4:0] mem_op_ld
 );
 
     always @(posedge clk) begin
         if (rst) begin
-            mem_valid           <= 1'b0;
+            mem_valid           <=  1'b0;
             mem_pc              <= 32'b0;
             mem_data_sram_we    <=  4'b0;
             mem_data_sram_wdata <= 32'b0;
@@ -34,6 +36,7 @@ module EXE_MEM_reg (
             mem_rf_waddr        <=  5'b0;
             mem_res_from_mem    <=  1'b0;
             mem_alu_result      <= 32'b0;
+            mem_op_ld           <=  5'b0;
         end
         else if (!mem_allowin) begin
             mem_valid           <= mem_valid;
@@ -44,9 +47,10 @@ module EXE_MEM_reg (
             mem_rf_waddr        <= mem_rf_waddr;
             mem_res_from_mem    <= mem_res_from_mem;
             mem_alu_result      <= mem_alu_result;
+            mem_op_ld           <= mem_op_ld;
         end
         else if (!exe_ready_go) begin
-            mem_valid           <= 1'b0;
+            mem_valid           <=  1'b0;
             mem_pc              <= 32'b0;
             mem_data_sram_we    <=  4'b0;
             mem_data_sram_wdata <= 32'b0;
@@ -54,6 +58,7 @@ module EXE_MEM_reg (
             mem_rf_waddr        <=  5'b0;
             mem_res_from_mem    <=  1'b0;
             mem_alu_result      <= 32'b0;
+            mem_op_ld           <=  5'b0;
         end
         else begin
             mem_valid           <= exe_valid;
@@ -64,6 +69,7 @@ module EXE_MEM_reg (
             mem_rf_waddr        <= exe_rf_waddr;
             mem_res_from_mem    <= exe_res_from_mem;
             mem_alu_result      <= exe_alu_result;
+            mem_op_ld           <= exe_op_ld;
         end
     end
 

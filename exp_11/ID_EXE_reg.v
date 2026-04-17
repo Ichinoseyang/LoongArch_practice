@@ -15,6 +15,7 @@ module ID_EXE_reg (
     input  wire        id_rf_we,
     input  wire [ 4:0] id_rf_waddr,
     input  wire        id_res_from_mem,
+    input  wire [ 4:0] id_op_ld,
 
     output reg         exe_valid,
     output reg  [31:0] exe_pc,
@@ -25,7 +26,8 @@ module ID_EXE_reg (
     output reg  [31:0] exe_data_sram_wdata,
     output reg         exe_rf_we,
     output reg  [ 4:0] exe_rf_waddr,
-    output reg         exe_res_from_mem
+    output reg         exe_res_from_mem,
+    output reg  [ 4:0] exe_op_ld
 );
 
     always @(posedge clk) begin
@@ -40,6 +42,7 @@ module ID_EXE_reg (
             exe_rf_we           <= 1'b0;
             exe_rf_waddr        <= 5'b0;
             exe_res_from_mem    <= 1'b0;
+            exe_op_ld           <= 5'b0;
         end
         else if (!exe_allowin) begin
             exe_valid           <= exe_valid;
@@ -52,6 +55,7 @@ module ID_EXE_reg (
             exe_rf_we           <= exe_rf_we;
             exe_rf_waddr        <= exe_rf_waddr;
             exe_res_from_mem    <= exe_res_from_mem;
+            exe_op_ld           <= exe_op_ld;
         end
         else if (!id_ready_go) begin
             exe_valid           <= 1'b0;
@@ -64,6 +68,7 @@ module ID_EXE_reg (
             exe_rf_we           <= 1'b0;
             exe_rf_waddr        <= 5'b0;
             exe_res_from_mem    <= 1'b0;
+            exe_op_ld           <= 5'b0;
         end
         else begin
             exe_valid           <= id_valid;
@@ -76,6 +81,7 @@ module ID_EXE_reg (
             exe_rf_we           <= id_rf_we;
             exe_rf_waddr        <= id_rf_waddr;
             exe_res_from_mem    <= id_res_from_mem;
+            exe_op_ld           <= id_op_ld;
         end
     end
 

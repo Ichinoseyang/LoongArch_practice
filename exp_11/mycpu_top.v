@@ -134,7 +134,7 @@ module mycpu_top(
     wire        res_from_mem;
     wire        dst_is_r1;
     wire        gr_we;
-    wire        mem_we;
+    wire [ 4:0] mem_we;
     wire        src_reg_is_rd;
     wire [4: 0] dest;
     wire [31:0] rj_value;
@@ -191,7 +191,13 @@ module mycpu_top(
     wire        inst_mod_w;
     wire        inst_div_wu;
     wire        inst_mod_wu;
+    wire        inst_ld_b;
+    wire        inst_ld_h;
     wire        inst_ld_w;
+    wire        inst_ld_bu;
+    wire        inst_ld_hu;
+    wire        inst_st_b;
+    wire        inst_st_h;
     wire        inst_st_w;
     wire        inst_jirl;
     wire        inst_b;
@@ -269,8 +275,14 @@ module mycpu_top(
     assign inst_mod_w     = op_31_26_d[6'h00] & op_25_22_d[4'h0] & op_21_20_d[2'h2] & op_19_15_d[5'h01];
     assign inst_div_wu    = op_31_26_d[6'h00] & op_25_22_d[4'h0] & op_21_20_d[2'h2] & op_19_15_d[5'h02];
     assign inst_mod_wu    = op_31_26_d[6'h00] & op_25_22_d[4'h0] & op_21_20_d[2'h2] & op_19_15_d[5'h03];
+    assign inst_ld_b      = op_31_26_d[6'h0a] & op_25_22_d[4'h0];
+    assign inst_ld_h      = op_31_26_d[6'h0a] & op_25_22_d[4'h1];
     assign inst_ld_w      = op_31_26_d[6'h0a] & op_25_22_d[4'h2];
+    assign inst_st_b      = op_31_26_d[6'h0a] & op_25_22_d[4'h4];
+    assign inst_st_h      = op_31_26_d[6'h0a] & op_25_22_d[4'h5];
     assign inst_st_w      = op_31_26_d[6'h0a] & op_25_22_d[4'h6];
+    assign inst_ld_bu     = op_31_26_d[6'h0a] & op_25_22_d[4'h8];
+    assign inst_ld_hu     = op_31_26_d[6'h0a] & op_25_22_d[4'h9];
     assign inst_jirl      = op_31_26_d[6'h13];
     assign inst_b         = op_31_26_d[6'h14];
     assign inst_bl        = op_31_26_d[6'h15];
@@ -282,7 +294,7 @@ module mycpu_top(
     assign inst_bgeu      = op_31_26_d[6'h1b];
     assign inst_lu12i_w   = op_31_26_d[6'h05] & ~id_inst[25];
 
-    assign alu_op[ 0]     = inst_add_w | inst_addi_w | inst_ld_w | inst_st_w | inst_jirl | inst_bl | inst_pcaddu12i;
+    assign alu_op[ 0]     = inst_add_w | inst_addi_w | inst_ld_w | inst_st_w | inst_jirl | inst_bl | inst_pcaddu12i | inst_ld_b | inst_ld_h | inst_ld_bu | inst_ld_hu | inst_st_b | inst_st_h;
     assign alu_op[ 1]     = inst_sub_w;
     assign alu_op[ 2]     = inst_slt | inst_slti;
     assign alu_op[ 3]     = inst_sltu | inst_sltui;
@@ -303,7 +315,7 @@ module mycpu_top(
     assign alu_op[18]     = inst_mod_wu;
 
     assign need_ui5       = inst_slli_w | inst_srli_w | inst_srai_w;
-    assign need_sign_si12 = inst_addi_w | inst_ld_w | inst_st_w | inst_slti | inst_sltui;
+    assign need_sign_si12 = inst_addi_w | inst_ld_w | inst_st_w | inst_slti | inst_sltui | inst_ld_b | inst_ld_h | inst_ld_bu | inst_ld_hu | inst_st_b | inst_st_h;
     assign need_zero_si12 = inst_andi | inst_ori | inst_xori;
     assign need_si16      = inst_jirl | inst_beq | inst_bne | inst_blt | inst_bge | inst_bltu | inst_bgeu;
     assign need_si20      = inst_lu12i_w | inst_pcaddu12i;
@@ -320,7 +332,7 @@ module mycpu_top(
 
     assign jirl_offs      = {{14{i16[15]}}, i16[15:0], 2'b0};
 
-    assign src_reg_is_rd  = inst_beq | inst_bne | inst_st_w | inst_blt | inst_bge | inst_bltu | inst_bgeu;
+    assign src_reg_is_rd  = inst_beq | inst_bne | inst_st_w | inst_blt | inst_bge | inst_bltu | inst_bgeu | inst_st_b | inst_st_h;
 
     assign src1_is_pc     = inst_jirl | inst_bl | inst_pcaddu12i;
 
@@ -333,17 +345,23 @@ module mycpu_top(
                             inst_andi   |
                             inst_ori    |
                             inst_xori   |
+                            inst_ld_b   |
+                            inst_ld_h   |
                             inst_ld_w   |
+                            inst_st_b   |
+                            inst_st_h   |
                             inst_st_w   |
+                            inst_ld_bu  |
+                            inst_ld_hu  |
                             inst_lu12i_w|
                             inst_jirl   |
                             inst_bl     |
                             inst_pcaddu12i;
 
-    assign res_from_mem   = inst_ld_w;
+    assign res_from_mem   = inst_ld_w | inst_ld_b | inst_ld_h | inst_ld_bu | inst_ld_hu;
     assign dst_is_r1      = inst_bl;
-    assign gr_we          = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b & ~inst_blt & ~inst_bge & ~inst_bltu & ~inst_bgeu;
-    assign mem_we         = inst_st_w;
+    assign gr_we          = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b & ~inst_blt & ~inst_bge & ~inst_bltu & ~inst_bgeu & ~inst_st_b & ~inst_st_h;
+    assign mem_we         = {inst_st_w, inst_st_w, inst_st_h, inst_st_b};
     assign dest           = dst_is_r1 ? 5'd1 : rd;
 
     assign rf_raddr1      = rj;
@@ -381,6 +399,7 @@ module mycpu_top(
     wire        id_rf_we;
     wire [ 4:0] id_rf_waddr;
     wire        id_res_from_mem;
+    wire [ 4:0] id_op_ld;
     wire [31:0] exe_pc;
     wire [18:0] exe_alu_op;
     wire [31:0] exe_alu_src1;
@@ -390,15 +409,23 @@ module mycpu_top(
     wire        exe_rf_we;
     wire [ 4:0] exe_rf_waddr;
     wire        exe_res_from_mem;
+    wire [ 4:0] exe_op_ld;
 
     assign id_alu_op          = alu_op;
     assign id_alu_src1        = alu_src1;
     assign id_alu_src2        = alu_src2;
-    assign id_data_sram_we    = {4{mem_we && valid}};
-    assign id_data_sram_wdata = rkd_value;
+    assign id_data_sram_we    = mem_we;
+    assign id_data_sram_wdata = inst_st_w ? rkd_value            :
+                                inst_st_h ? {2{rkd_value[15:0]}} :
+                                            {4{rkd_value[ 7:0]}} ;
     assign id_rf_we           = gr_we && valid;
     assign id_rf_waddr        = dest;
     assign id_res_from_mem    = res_from_mem;
+    assign id_op_ld[0]        = inst_ld_b;
+    assign id_op_ld[1]        = inst_ld_h;
+    assign id_op_ld[2]        = inst_ld_w;
+    assign id_op_ld[3]        = inst_ld_bu;
+    assign id_op_ld[4]        = inst_ld_hu;
 
     ID_EXE_reg id_exe_reg(
         .clk                 (clk                ),
@@ -415,6 +442,7 @@ module mycpu_top(
         .id_rf_we            (id_rf_we           ),
         .id_rf_waddr         (id_rf_waddr        ),
         .id_res_from_mem     (id_res_from_mem    ),
+        .id_op_ld            (id_op_ld           ),
         .exe_valid           (exe_valid          ),
         .exe_pc              (exe_pc             ),
         .exe_alu_op          (exe_alu_op         ),
@@ -424,7 +452,8 @@ module mycpu_top(
         .exe_data_sram_wdata (exe_data_sram_wdata),
         .exe_rf_we           (exe_rf_we          ),
         .exe_rf_waddr        (exe_rf_waddr       ),
-        .exe_res_from_mem    (exe_res_from_mem   )
+        .exe_res_from_mem    (exe_res_from_mem   ),
+        .exe_op_ld           (exe_op_ld          )
     );
 
     // execute
@@ -439,7 +468,10 @@ module mycpu_top(
     );
 
     assign data_sram_addr  = alu_result;
-    assign data_sram_we    = exe_data_sram_we & {4{exe_valid}};
+    assign data_sram_we    = (exe_data_sram_we[3] ? 4'b1111 :
+                              exe_data_sram_we[1] ? (alu_result[1] ? 4'b1100 : 4'b0011) :
+                              exe_data_sram_we[0] ? (alu_result[1:0] == 2'b00 ? 4'b0001 : alu_result[1:0] == 2'b01 ? 4'b0010 : alu_result[1:0] == 2'b10 ? 4'b0100 : 4'b1000) :
+                              4'b0000) & {4{exe_valid}};
     assign data_sram_wdata = exe_data_sram_wdata;
 
     // -------
@@ -452,6 +484,7 @@ module mycpu_top(
     wire [ 4:0] mem_rf_waddr;
     wire        mem_res_from_mem;
     wire [31:0] mem_alu_result;
+    wire [ 4:0] mem_op_ld;
 
     assign exe_alu_result  = alu_result;
 
@@ -468,6 +501,7 @@ module mycpu_top(
         .exe_rf_waddr        (exe_rf_waddr       ),
         .exe_res_from_mem    (exe_res_from_mem   ),
         .exe_alu_result      (exe_alu_result     ),
+        .exe_op_ld           (exe_op_ld          ),
         .mem_valid           (mem_valid          ),
         .mem_pc              (mem_pc             ),
         .mem_data_sram_we    (mem_data_sram_we   ),
@@ -475,16 +509,33 @@ module mycpu_top(
         .mem_rf_we           (mem_rf_we          ),
         .mem_rf_waddr        (mem_rf_waddr       ),
         .mem_res_from_mem    (mem_res_from_mem   ),
-        .mem_alu_result      (mem_alu_result     )
+        .mem_alu_result      (mem_alu_result     ),
+        .mem_op_ld           (mem_op_ld          )
     );
 
     // memory access
 
+    wire        sel_byte;
+    wire        sel_half;
+    wire        sel_zeroextend;
+    wire [ 7:0] byte_result;
+    wire [15:0] half_result;
     wire [31:0] mem_result;
     wire [31:0] final_result;
 
-    assign mem_result      = data_sram_rdata;
-    assign final_result    = mem_res_from_mem ? mem_result : mem_alu_result;
+    assign sel_byte         = mem_op_ld[0] | mem_op_ld[3];
+    assign sel_half         = mem_op_ld[1] | mem_op_ld[4];
+    assign sel_zeroextend   = mem_op_ld[3] | mem_op_ld[4];
+    assign byte_result      = mem_alu_result[1:0] == 2'b00 ? data_sram_rdata[7:0]   :
+                              mem_alu_result[1:0] == 2'b01 ? data_sram_rdata[15:8]  :
+                              mem_alu_result[1:0] == 2'b10 ? data_sram_rdata[23:16] :
+                                                             data_sram_rdata[31:24] ;
+    assign half_result      = mem_alu_result[1] ? data_sram_rdata[31:16] : data_sram_rdata[15:0];
+    assign mem_result       = sel_byte ? (sel_zeroextend ? {24'b0, byte_result} : {{24{byte_result[ 7]}}, byte_result}) :
+                              sel_half ? (sel_zeroextend ? {16'b0, half_result} : {{16{half_result[15]}}, half_result}) :
+                              data_sram_rdata;
+    
+    assign final_result     = mem_res_from_mem ? mem_result : mem_alu_result;
 
     // -------------
 
@@ -494,7 +545,7 @@ module mycpu_top(
     wire [ 4:0] wb_rf_waddr;
     wire [31:0] wb_rf_wdata;
 
-    assign mem_rf_wdata    = final_result;
+    assign mem_rf_wdata = final_result;
 
     MEM_WB_reg mem_wb_reg(
         .clk          (clk         ),
@@ -549,7 +600,7 @@ module mycpu_top(
     assign id_need_rj   = !inst_lu12i_w && !inst_b && !inst_bl && (rj != 5'b0) && id_valid;
     assign id_need_rk   = (inst_add_w || inst_sub_w || inst_slt || inst_sltu || inst_and || inst_or || inst_nor || inst_xor || inst_sll_w || inst_srl_w || inst_sra_w
                         || inst_mul_w || inst_mulh_w || inst_mulh_wu || inst_div_w || inst_mod_w || inst_div_wu || inst_mod_wu) && (rk != 5'b0) && id_valid;
-    assign id_need_rd   = (inst_beq || inst_bne || inst_blt || inst_bge || inst_bltu || inst_bgeu || inst_st_w) && (rd != 5'b0) && id_valid;
+    assign id_need_rd   = (inst_beq || inst_bne || inst_blt || inst_bge || inst_bltu || inst_bgeu || inst_st_w || inst_st_b || inst_st_h) && (rd != 5'b0) && id_valid;
 
     assign exe_use_rj   = exe_valid && exe_rf_we && exe_rf_waddr == rj;
     assign exe_use_rk   = exe_valid && exe_rf_we && exe_rf_waddr == rk;
